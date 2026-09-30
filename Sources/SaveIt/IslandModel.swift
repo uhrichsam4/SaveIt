@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Observation
 
-enum Phase: Equatable { case idle, downloading, done, error }
+enum Phase: Equatable { case idle, setup, downloading, done, error }
 
 /// What the island is currently showing. Drives the shape metrics and which content view is on screen.
 enum IslandMode: Equatable {
@@ -50,6 +50,10 @@ final class IslandModel {
     // UI state
     var isExpanded = false
     var phase: Phase = .idle
+    // First-run tool setup
+    var setupLabel = ""
+    var setupProgress: Double = 0
+    var errorTitle = "Download failed"
     var badgeVisible = false            // live done / error pill after finishing
     var link = ""
     var clipboardURL: String?
@@ -98,7 +102,7 @@ final class IslandModel {
     var mode: IslandMode {
         if isExpanded { return .expanded(phase) }
         switch phase {
-        case .downloading: return .live
+        case .downloading, .setup: return .live
         case .done where badgeVisible: return .liveDone
         case .error where badgeVisible: return .liveError
         default: return .collapsed
@@ -112,7 +116,7 @@ final class IslandModel {
         case .idle:
             return Layout.rowHeight + Layout.rowGap + Layout.pillRowHeight
                 + (showsChip ? Layout.chipHeight + Layout.rowGap : 0)
-        case .downloading: return 20 + 12 + 6 + 12 + Layout.pillRowHeight
+        case .downloading, .setup: return 20 + 12 + 6 + 12 + Layout.pillRowHeight
         case .done: return 40 + 14 + Layout.pillRowHeight
         case .error: return 48 + 14 + Layout.pillRowHeight
         }

@@ -9,6 +9,7 @@ final class IslandController: NSObject, NSWindowDelegate, NSMenuDelegate {
     private var hosting: NSHostingView<IslandRootView>!
     private var statusItem: NSStatusItem!
     private let downloader = Downloader()
+    private let bootstrapper = ToolBootstrapper()
 
     private var screen: NSScreen?
     private var notchCenterX: CGFloat = 0
@@ -366,9 +367,13 @@ final class IslandController: NSObject, NSWindowDelegate, NSMenuDelegate {
     }
 
     private func startDownload(url: String, quality: Quality) {
-        guard !downloader.isRunning else { return }
+        guard !downloader.isRunning, !bootstrapper.isRunning else { return }
         badgeTimer?.cancel()
         model.lastRequest = (url, quality)
+        if !ToolManager.missing.isEmpty {
+            runSetup(thenDownload: url, quality: quality)
+            return
+        }
         model.title = ""
         model.speed = ""; model.eta = ""
         model.stage = .starting
@@ -392,6 +397,37 @@ final class IslandController: NSObject, NSWindowDelegate, NSMenuDelegate {
         downloader.start(url: url, folder: model.folder, quality: quality)
     }
 
+    /// First run: download yt-dlp / ffmpeg into Application Support, then continue the download.
+    private func runSetup(thenDownload url: String, quality: Quality) {
+        model.setupProgress = 0
+        model.setupLabel = "Preparing…"
+        withAnimation(Anim.island) {
+            model.link = ""
+            model.badgeVisible = false
+            model.phase = .setup
+        }
+        bootstrapper.onProgress = { [weak self] label, f in
+            self?.model.setupLabel = label
+            self?.model.setupProgress = f
+        }
+        bootstrapper.run { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.refreshVersion()
+                self.startDownload(url: url, quality: quality)
+            case .failure(let e):
+                self.model.errorTitle = "Setup failed"
+                self.model.errorMessage = e.localizedDescription
+                withAnimation(Anim.island) {
+                    self.model.phase = .error
+                    self.model.badgeVisible = true
+                }
+                self.scheduleBadgeHide(after: 5)
+            }
+        }
+    }
+
     private func finished(_ outcome: DownloadOutcome) {
         switch outcome {
         case .success(let u):
@@ -403,6 +439,7 @@ final class IslandController: NSObject, NSWindowDelegate, NSMenuDelegate {
             }
             scheduleBadgeHide(after: 4)
         case .failure(let msg):
+            model.errorTitle = "Download failed"
             model.errorMessage = msg
             withAnimation(Anim.island) {
                 model.phase = .error
@@ -575,6 +612,18 @@ final class IslandController: NSObject, NSWindowDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
                 self.logKey("final (mode \(self.model.mode)); front app: \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "?")")
                 NSApp.terminate(nil)
+            }
+        case "setup", "setup-expanded", "setup-error":
+            forced = true
+            model.setupProgress = 0.41
+            model.setupLabel = "Downloading yt-dlp · 14.5 of 35.4 MB"
+            model.phase = .setup
+            model.isExpanded = s != "setup"
+            if s == "setup-error" {
+                model.lastRequest = ("https://example.com/v", .best)
+                model.errorTitle = "Setup failed"
+                model.errorMessage = "Couldn't download the tools: The Internet connection appears to be offline."
+                model.phase = .error
             }
         case "downloading", "downloading-expanded":
             forced = s == "downloading-expanded"

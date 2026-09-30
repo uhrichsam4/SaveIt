@@ -75,26 +75,15 @@ final class Downloader {
     /// Field separator for machine lines: ASCII unit separator, never in filenames.
     static let sep = "\u{1F}"
 
-    static let home = FileManager.default.homeDirectoryForCurrentUser.path
-    static let searchDirs = ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.yoinks/bin"]
-    static var toolPATH: String {
-        (searchDirs + ["\(home)/.deno/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]).joined(separator: ":")
-    }
-
-    static func resolve(_ tool: String) -> String? {
-        for dir in searchDirs {
-            let path = "\(dir)/\(tool)"
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        return nil
-    }
+    static var toolPATH: String { ToolManager.toolPATH }
+    static func resolve(_ tool: String) -> String? { ToolManager.resolve(tool) }
 
     var isRunning: Bool { process != nil }
 
     func start(url: String, folder: URL, quality: Quality) {
         guard process == nil else { return }
         guard let ytdlp = Self.resolve("yt-dlp") else {
-            finish(.failure("yt-dlp not found in /opt/homebrew/bin, /usr/local/bin or ~/.yoinks/bin"))
+            finish(.failure("yt-dlp isn't installed yet. Retry to download it."))
             return
         }
         let s = Self.sep
@@ -421,7 +410,8 @@ enum YTDLPUpdater {
     }
 
     @discardableResult
-    static func run(_ path: String, _ args: [String]) -> (status: Int32, output: String) {
+    static func run(_ path: String, _ args: [String], timeout: TimeInterval = 600,
+                    stdoutTo file: URL? = nil) -> (status: Int32, output: String) {
         guard FileManager.default.isExecutableFile(atPath: path) else { return (127, "\(path) not found") }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
@@ -430,12 +420,23 @@ enum YTDLPUpdater {
         env["PATH"] = Downloader.toolPATH
         p.environment = env
         let pipe = Pipe()
-        p.standardOutput = pipe
+        var outHandle: FileHandle?
+        if let file {
+            FileManager.default.createFile(atPath: file.path, contents: nil)
+            outHandle = try? FileHandle(forWritingTo: file)
+            p.standardOutput = outHandle ?? FileHandle.nullDevice
+        } else {
+            p.standardOutput = pipe
+        }
         p.standardError = pipe
         p.standardInput = FileHandle.nullDevice
         do { try p.run() } catch { return (126, error.localizedDescription) }
+        let killer = DispatchWorkItem { if p.isRunning { p.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         p.waitUntilExit()
+        killer.cancel()
+        try? outHandle?.close()
         return (p.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 }

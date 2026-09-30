@@ -90,6 +90,7 @@ struct IslandRootView: View {
                 ExpandedContainer(model: model) {
                     switch phase {
                     case .idle: IdleView(model: model, actions: actions)
+                    case .setup: SetupView(model: model)
                     case .downloading: DownloadingView(model: model, actions: actions)
                     case .done: DoneView(model: model, actions: actions)
                     case .error: ErrorView(model: model, actions: actions)
@@ -216,12 +217,13 @@ private struct PercentText: View {
 
 private struct LiveActivityView: View {
     var model: IslandModel
+    private var liveProgress: Double { model.phase == .setup ? model.setupProgress : model.progress }
     var body: some View {
         HStack(spacing: 0) {
-            ProgressRing(progress: model.progress)
+            ProgressRing(progress: liveProgress)
                 .frame(width: Layout.liveExtension)
             Color.clear.frame(width: model.notchWidth)
-            PercentText(progress: model.progress, size: 12)
+            PercentText(progress: liveProgress, size: 12)
                 .frame(width: Layout.liveExtension)
                 .offset(x: -1)
         }
@@ -438,6 +440,55 @@ private struct DownloadingView: View {
     }
 }
 
+// MARK: - Expanded: first-run setup
+
+private struct SetupView: View {
+    var model: IslandModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .symbolEffect(.pulse, options: .repeating)
+                Text("Setting up… (first run)")
+                    .font(.rounded(14, .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                PercentText(progress: model.setupProgress, size: 14)
+                    .frame(width: 46, alignment: .trailing)
+            }
+            .frame(height: 20)
+
+            Capsule().fill(Color.white.opacity(0.14))
+                .frame(width: Layout.innerWidth, height: 6)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(Color.white)
+                        .frame(width: max(6, Layout.innerWidth * model.setupProgress), height: 6)
+                        .animation(Anim.progress, value: model.setupProgress)
+                }
+
+            HStack(spacing: 8) {
+                Text(model.setupLabel)
+                    .font(.rounded(12))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .lineLimit(1)
+                    .contentTransition(.opacity)
+                    .animation(.smooth(duration: 0.25), value: model.setupLabel)
+                Spacer()
+                Text("One-time download of yt-dlp + ffmpeg")
+                    .font(.rounded(11))
+                    .foregroundStyle(Color.white.opacity(0.35))
+                    .lineLimit(1)
+            }
+            .frame(height: Layout.pillRowHeight)
+        }
+    }
+}
+
 // MARK: - Expanded: done / error
 
 private struct DoneView: View {
@@ -493,7 +544,7 @@ private struct ErrorView: View {
                     .foregroundStyle(Color.orange)
                     .frame(width: 30)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Download failed")
+                    Text(model.errorTitle)
                         .font(.rounded(11, .semibold))
                         .foregroundStyle(Color.orange)
                     Text(model.errorMessage)

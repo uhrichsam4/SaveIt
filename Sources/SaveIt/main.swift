@@ -52,8 +52,27 @@ func runHeadless(_ rest: [String]) -> Never {
         }
     }
     setvbuf(stdout, nil, _IOLBF, 0)
-    d.start(url: rest[0], folder: folder, quality: q)
-    RunLoop.main.run()
+    print("tools: yt-dlp=\(ToolManager.resolve("yt-dlp") ?? "missing") ffmpeg=\(ToolManager.resolve("ffmpeg") ?? "missing")")
+    let boot = ToolBootstrapper()
+    var lastLabel = ""
+    var lastSetupPct = -1
+    boot.onProgress = { label, f in
+        let pct = Int(f * 100)
+        let stem = label.components(separatedBy: " · ").first ?? label
+        if stem != lastLabel || pct / 10 != lastSetupPct / 10 {
+            lastLabel = stem; lastSetupPct = pct
+            print("setup: \(pct)% \(label)")
+        }
+    }
+    boot.run { r in
+        switch r {
+        case .failure(let e): print("setup error: \(e.localizedDescription)"); exit(1)
+        case .success:
+            print("tools: yt-dlp=\(ToolManager.resolve("yt-dlp") ?? "missing") ffmpeg=\(ToolManager.resolve("ffmpeg") ?? "missing") ffprobe=\(ToolManager.resolve("ffprobe") ?? "missing")")
+            d.start(url: rest[0], folder: folder, quality: q)
+        }
+    }
+    withExtendedLifetime(boot) { RunLoop.main.run() }
     exit(0)
 }
 
