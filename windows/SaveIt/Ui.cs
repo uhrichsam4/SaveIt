@@ -165,7 +165,7 @@ namespace SaveIt
             Stroked("M6.8,9.2 L9.2,6.8 M7.4,4.6 L8.6,3.4 C9.8,2.2 11.8,2.2 13,3.4 C14.2,4.6 14.2,6.6 13,7.8 L11.8,9 M8.6,11.4 L7.4,12.6 C6.2,13.8 4.2,13.8 3,12.6 C1.8,11.4 1.8,9.4 3,8.2 L4.2,7", size, brush, 1.8, 16);
 
         public static FrameworkElement Film(double size, Brush brush) =>
-            Stroked("M3,3.5 L13,3.5 L13,12.5 L3,12.5 Z M5.5,3.5 L5.5,12.5 M10.5,3.5 L10.5,12.5 M3,8 L5.5,8 M10.5,8 L13,8", size, brush, 1.5, 16);
+            Stroked("M2,2.8 L14,2.8 L14,13.2 L2,13.2 Z M5,2.8 L5,13.2 M11,2.8 L11,13.2 M2,6.3 L5,6.3 M2,9.7 L5,9.7 M11,6.3 L14,6.3 M11,9.7 L14,9.7", size, brush, 1.4, 16);
 
         public static FrameworkElement Music(double size, Brush brush)
         {

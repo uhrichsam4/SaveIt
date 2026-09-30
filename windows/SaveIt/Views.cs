@@ -569,7 +569,7 @@ namespace SaveIt
 
     internal sealed class DownloadingView : IslandView
     {
-        readonly Grid iconHost = new() { Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center };
+        readonly Grid iconHost = new() { Width = 15, Height = 15, VerticalAlignment = VerticalAlignment.Center };
         readonly TextBlock title;
         readonly TextBlock percent;
         readonly Border fill;
@@ -634,9 +634,9 @@ namespace SaveIt
                 iconHost.Children.Clear();
                 iconHost.Children.Add(kind switch
                 {
-                    "setup" => Icons.ArrowDown(12, Theme.W(0.6)),
-                    "mp3" => Icons.Music(12, Theme.W(0.6)),
-                    _ => Icons.Film(12, Theme.W(0.6)),
+                    "setup" => Icons.ArrowDown(13, Theme.W(0.6)),
+                    "mp3" => Icons.Music(14, Theme.W(0.6)),
+                    _ => Icons.Film(14, Theme.W(0.6)),
                 });
             }
             title.Text = setup ? "Setting up SaveIt…" : (I.VideoTitle.Length == 0 ? "Fetching video info…" : I.VideoTitle);
