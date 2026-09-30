@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+screenshots/
+.test-output/
+dist/
+*.app
+.DS_Store
+windows/**/bin/
+windows/**/obj/
