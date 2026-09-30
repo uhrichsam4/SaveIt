@@ -55,7 +55,7 @@ jobs:
         run: ./windows/ci/screenshots.ps1 -Exe "$PWD/dist/SaveIt.exe" -OutDir "$PWD/artifacts/screenshots" -LogDir "$PWD/artifacts/logs"
 
       - name: Headless download smoke test (bootstrap + ffprobe)
-        if: success() || failure()
+        if: (success() || failure()) && hashFiles('dist/SaveIt.exe') != ''
         run: ./windows/ci/smoke-download.ps1 -Exe "$PWD/dist/SaveIt.exe" -Work "$env:RUNNER_TEMP/saveit-smoke" -LogDir "$PWD/artifacts/logs"
 
       - name: Upload app zip
