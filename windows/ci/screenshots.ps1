@@ -42,7 +42,8 @@ Start-Sleep -Seconds 3
 
 $w = 900; $h = 320
 $x = $bounds.X + [int](($bounds.Width - $w) / 2); $y = $bounds.Y
-$op = [System.Drawing.CopyPixelOperation]([int][System.Drawing.CopyPixelOperation]::SourceCopy -bor [int][System.Drawing.CopyPixelOperation]::CaptureBlt)
+# With DWM composition the screen DC already includes layered (per-pixel alpha) windows.
+$op = [System.Drawing.CopyPixelOperation]::SourceCopy
 
 function Shot([string] $name) {
     $bmp = New-Object System.Drawing.Bitmap $w, $h
