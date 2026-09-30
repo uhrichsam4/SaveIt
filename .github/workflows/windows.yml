@@ -1,0 +1,89 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows, main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Version from git tag
+        id: ver
+        run: |
+          $v = '1.0.0'
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = $env:GITHUB_REF_NAME.Substring(1)
+          } else {
+            $t = git describe --tags --abbrev=0 --match 'v*' 2>$null
+            if ($LASTEXITCODE -eq 0 -and $t) { $v = $t.Trim().Substring(1) }
+          }
+          if ($v -notmatch '^\d+(\.\d+){0,3}(-[0-9A-Za-z.-]+)?$') { $v = '1.0.0' }
+          Write-Host "version $v"
+          "version=$v" >> $env:GITHUB_OUTPUT
+          $global:LASTEXITCODE = 0
+
+      - name: Publish (self-contained single-file win-x64)
+        run: >
+          dotnet publish windows/SaveIt/SaveIt.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:Version=${{ steps.ver.outputs.version }} -o dist
+
+      - name: Zip
+        run: |
+          Compress-Archive -Path dist/SaveIt.exe -DestinationPath SaveIt-Windows.zip -CompressionLevel Optimal -Force
+          Get-Item dist/SaveIt.exe, SaveIt-Windows.zip | ForEach-Object { Write-Host ("{0}: {1:N1} MB" -f $_.Name, ($_.Length / 1MB)) }
+
+      - name: Screenshots of every island state
+        run: ./windows/ci/screenshots.ps1 -Exe "$PWD/dist/SaveIt.exe" -OutDir "$PWD/artifacts/screenshots" -LogDir "$PWD/artifacts/logs"
+
+      - name: Headless download smoke test (bootstrap + ffprobe)
+        if: (success() || failure()) && hashFiles('dist/SaveIt.exe') != ''
+        run: ./windows/ci/smoke-download.ps1 -Exe "$PWD/dist/SaveIt.exe" -Work "$env:RUNNER_TEMP/saveit-smoke" -LogDir "$PWD/artifacts/logs"
+
+      - name: Upload app zip
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SaveIt-Windows
+          path: SaveIt-Windows.zip
+          if-no-files-found: warn
+
+      - name: Upload screenshots + logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-and-logs
+          path: artifacts/
+          if-no-files-found: warn
+
+      - name: Attach zip to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --title "SaveIt $tag" --notes "SaveIt $tag"
+            if ($LASTEXITCODE -ne 0) { throw 'release create failed' }
+          }
+          gh release upload $tag SaveIt-Windows.zip --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'release upload failed' }
